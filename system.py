@@ -1,0 +1,254 @@
+import os
+import sys
+import nltk
+import string
+import math
+import pickle
+import numpy as np
+from scipy.cluster.hierarchy import dendrogram, linkage
+from matplotlib import pyplot as plt
+from nltk.corpus import stopwords
+from nltk.stem import PorterStemmer
+
+#=========================================================================================================================================
+#Methods
+#Remove stopwords, lowercase all character, stemming, remove numbers and tokenize all words, remove puntuations
+#Collect term frequency and inverse document frequnecy
+def documentProcessing(fileData,currentTf,fileName):
+    stop_words = set(stopwords.words('english'))
+    ps = PorterStemmer()
+    for eachLine in fileData:
+        tokenizeLine = nltk.tokenize.word_tokenize(eachLine)
+        for eachWord in tokenizeLine:
+            eachWord = eachWord.lower()
+            eachWord = eachWord.translate(str.maketrans('', '', string.punctuation))
+            if not eachWord in stop_words and not eachWord.isnumeric() and not len(eachWord) == 1 and not len(eachWord) == 0:
+                stemWord = ps.stem(eachWord)
+                if not stemWord in currentTf:
+                    currentTf[stemWord] = 1
+                else:
+                    currentTf[stemWord] += 1
+    returnObject = {'fileName':fileName,'allTerms':currentTf}
+    return returnObject
+
+#Calculate word appear in document through entire document collection
+def wordAppearInDocCal(termApperInDoc,currentDocTerms):
+    for eachKey in currentDocTerms:
+        if not eachKey in termApperInDoc:
+            termApperInDoc[eachKey] = 1
+        else:
+            termApperInDoc[eachKey] += 1
+    return termApperInDoc
+
+#Calculate tf-idf score for each words within each document
+def tfidfCal(allTf,termApperInDoc,totalDocNum):
+    tfidfList = []
+    for eachDocument in allTf:
+        allTerms = eachDocument['allTerms']
+        wordCounts = len(allTerms.keys())
+        curentDocTfidf = {}
+        for eachWord in allTerms:
+            tf = allTerms[eachWord]/wordCounts
+            idf = math.log(totalDocNum/termApperInDoc[eachWord]+1)+1
+            curentDocTfidf[eachWord] = tf*idf
+        tfidf={'fileName':eachDocument['fileName'],'tfidfScores':curentDocTfidf}
+        tfidfList.append(tfidf)
+    return tfidfList
+
+#Load documents pickle files
+def loadDocumentPickles(pickleFilePath):
+    documents = []
+    listOfFiles = os.listdir(pickleFilePath)
+    for eachFile in listOfFiles:
+        currentFilePath = os.path.join(pickleFilePath,eachFile)
+        currentFile = open(currentFilePath,'rb')
+        doucmentData = pickle.load(currentFile)
+        documents.append(doucmentData)
+        currentFile.close()
+    return documents
+
+#Processing Query
+def queryProcessing(userQuery):
+    stop_words = set(stopwords.words('english'))
+    ps = PorterStemmer()
+    tokenizeQuery = nltk.tokenize.word_tokenize(userQuery)
+    queryTf = {}
+    for eachWord in tokenizeQuery:
+        if not eachWord in stop_words and not eachWord.isnumeric() and not len(eachWord) == 1 and not len(eachWord) == 0:
+            stemWord = ps.stem(eachWord)
+            if not stemWord in queryTf:
+                queryTf[stemWord] = 1
+            else:
+                queryTf[stemWord] += 1
+    return queryTf
+
+#Regular scoring by adding terms and score
+def addScoreSimilirity(queryTf,documents):
+    tfidfScoreLists = []
+    for eachDoc in documents:
+        tfidfScores = eachDoc['tfidfScores']
+        eachDocScore = 0
+        for eachWord in queryTf:
+            counts = queryTf[eachWord]
+            if eachWord in tfidfScores:
+                eachDocScore += counts*tfidfScores[eachWord]
+        tfidfScoreLists.append({'fileName':eachDoc['fileName'],'finalScore':eachDocScore})
+    return tfidfScoreLists
+
+#Cosine similirty Scoring
+def cosineSimilirity(queryTf,documents):
+    tfidfScoreLists= []
+    for eachDoc in documents:
+        tfidfScore = eachDoc['tfidfScores']
+        currentTop = 0
+        botQuery = 0
+        botDoc = 0
+        for eachWord in queryTf:
+            queryCount = queryTf[eachWord]
+            docCount = 0
+            if eachWord in tfidfScore:
+                docCount = tfidfScore[eachWord]
+            currentTop += queryCount*docCount
+            botQuery += queryCount**2
+            botDoc += docCount **2
+        botQuery = math.sqrt(botQuery)
+        botDoc = math.sqrt(botDoc)
+        currentBot = botQuery*botDoc
+        if currentBot == 0:
+            cosineSimilirityScore = 0
+        else:
+            cosineSimilirityScore = currentTop/currentBot
+        tfidfScoreLists.append({'fileName':eachDoc['fileName'],'finalScore':cosineSimilirityScore})
+    return tfidfScoreLists
+
+#Get all words within document collection
+def getAllWords(documents):
+    allWordSet = set()
+    for eachDoc in documents:
+        currentWords = eachDoc['tfidfScores'].keys()
+        for eachWord in currentWords:
+            allWordSet.add(eachWord)
+    return allWordSet
+
+#Generate numpy array for each documents
+def documentArrayGeneration(documents,allWordSet):
+    allDocsList = []
+    for eachDoc in documents:
+        tfidfScoreDict = eachDoc['tfidfScores']
+        currentDocList = []
+        for eachWord in allWordSet:
+            if eachWord in tfidfScoreDict:
+                currentDocList.append(tfidfScoreDict[eachWord])
+            else:
+                currentDocList.append(0)
+        allDocsList.append(currentDocList)
+    return allDocsList
+
+#Pretty print output
+def prettyPrint(inputList):
+    for each in inputList:
+        print(each)
+#=========================================================================================================================================
+#Main
+cwd = os.getcwd()
+dataPath = os.path.join(cwd,"data")
+picklePath = os.path.join(cwd,"pickle")
+userCommand = ""
+command = sys.argv
+if len(command) > 1:
+    userCommand = command[1]
+
+#Document processing, data preprocessing and pickle creation
+if userCommand == "-d":
+    #documents processing, record all tfidf score, and pickle the data
+    listOfFiles = os.listdir(dataPath)
+    totalDocNum = len(listOfFiles)
+    allTf=[]
+    termApperInDoc = {}
+    for eachFile in listOfFiles:
+        print("Processing "+eachFile)
+        currentFilePath = os.path.join(dataPath,eachFile)
+        currentFile = open(currentFilePath,'r',errors="ignore")
+        currentTf = {}
+        currentDic = documentProcessing(currentFile,currentTf,eachFile)
+        termApperInDoc= wordAppearInDocCal(termApperInDoc,currentDic['allTerms'])
+        allTf.append(currentDic)
+
+    tfidfList = tfidfCal(allTf,termApperInDoc,totalDocNum)
+    for eachDocument in tfidfList:
+        docName = eachDocument['fileName'].replace(".txt",".pickle")
+        pickleFilePath = os.path.join(picklePath,docName)
+        pickleFile = open(pickleFilePath,'wb')
+        pickle.dump(eachDocument,pickleFile)
+        pickleFile.close()
+
+#Query processing, user searching
+elif userCommand == "-q":
+    print("Please Select a Model:")
+    print("1. Raw Count Model")
+    print("2. Cosine Similirity Model")
+    modelSelection = input()
+    #modelSelection = 2
+    documents = loadDocumentPickles(picklePath)
+
+    if modelSelection == "1":
+        scoreList = addScoreSimilirity(queryTf,documents)
+    elif modelSelection == "2":
+        scoreList= cosineSimilirity(queryTf,documents)
+    else:
+        print("Please select the correct model by given number 1 or 2")
+        sys.exit()
+        
+    userInput = input('Please provide a query: ')
+    queryTf = queryProcessing(userInput)
+    scoreList= []
+    #userInput = "deep learning question answering system"
+    #userInput = "ibm watson"
+    sortedList = sorted(scoreList, key=lambda k: k['finalScore'],reverse=True)
+    prettyPrint(sortedList)
+
+elif userCommand == "-c":
+    if len(command) > 2:
+        clusteringOption = command[2]
+    else:
+        print("Please provide what method you would like to use. Ex. python system.py -c -METHOD")
+        print("METHOD: -single, -complete, -average, -weighted, -centroid")
+        sys.exit()
+    clusterMethod =""
+    if clusteringOption == '-single':
+        clusterMethod = "single"
+    elif clusteringOption == "-complete":
+        clusterMethod = "complete"
+    elif clusteringOption == "-average":
+        clusterMethod = "average"
+    elif clusteringOption == "-weighted":
+        clusterMethod = "weighted"
+    elif clusteringOption == "-centroid":
+        clusterMethod = "centroid"
+    else:
+        print("invalid method provided")
+        print("METHOD: -single, -complete, -average, -weighted, -centroid")
+        sys.exit()
+
+    clusteringOption = ""
+    documents = loadDocumentPickles(picklePath)
+    documentsCount = len(documents)
+    print("Geting All Words")
+    wordsSet = getAllWords(documents)
+    print("Creating Numpy Array")
+    doctfidfList = documentArrayGeneration(documents,wordsSet)
+    numpyArray = np.array(doctfidfList)
+    linked = linkage(numpyArray, clusterMethod)
+    print(linked)
+    plt.figure(figsize=(10, 7))
+    dendrogram(linked,
+            orientation='top',
+            distance_sort='descending',
+            show_leaf_counts=True)
+    plt.show()
+    
+else:
+    print("Extra commands require")
+    print("-d for document processing")
+    print("-q for query processing")
+    print("-c for clustering")
