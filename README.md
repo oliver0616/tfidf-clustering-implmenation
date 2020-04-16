@@ -4,8 +4,12 @@ This is a quick example of using tf-idf and cosine similirty to build a informat
 # Implementation
 ## Data preprocessing
 Word tokenization, Lowercase all words, remove all stopwords.
-## 
-
+## Document Processing
+tfidf scores calculate for each documents
+## Query Processing
+raw count calculate, cosine similirty calculate
+## Clustering
+hierarchy clustering, method: single, complete, centroid, avergae, weighted
 
 # Setup
 1. Clone this repository
