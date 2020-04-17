@@ -184,13 +184,18 @@ if userCommand == "-d":
 
 #Query processing, user searching
 elif userCommand == "-q":
+    documents = loadDocumentPickles(picklePath)
+    scoreList= []
+    #userInput = "deep learning question answering system"
+    #userInput = "ibm watson"
+    userInput = input('Please provide a query: ')
+    queryTf = queryProcessing(userInput)
     print("Please Select a Model:")
     print("1. Raw Count Model")
     print("2. Cosine Similirity Model")
     modelSelection = input()
     #modelSelection = 2
-    documents = loadDocumentPickles(picklePath)
-
+    
     if modelSelection == "1":
         scoreList = addScoreSimilirity(queryTf,documents)
     elif modelSelection == "2":
@@ -198,12 +203,7 @@ elif userCommand == "-q":
     else:
         print("Please select the correct model by given number 1 or 2")
         sys.exit()
-        
-    userInput = input('Please provide a query: ')
-    queryTf = queryProcessing(userInput)
-    scoreList= []
-    #userInput = "deep learning question answering system"
-    #userInput = "ibm watson"
+
     sortedList = sorted(scoreList, key=lambda k: k['finalScore'],reverse=True)
     prettyPrint(sortedList)
 
@@ -238,6 +238,7 @@ elif userCommand == "-c":
     print("Creating Numpy Array")
     doctfidfList = documentArrayGeneration(documents,wordsSet)
     numpyArray = np.array(doctfidfList)
+    print(numpyArray)
     linked = linkage(numpyArray, clusterMethod)
     print(linked)
     plt.figure(figsize=(10, 7))
@@ -246,9 +247,65 @@ elif userCommand == "-c":
             distance_sort='descending',
             show_leaf_counts=True)
     plt.show()
+
+elif userCommand == "-cran":
+    cranfieldPath = os.path.join(cwd,"cranfield")
+    cranfieldQueriesPath = os.path.join(cranfieldPath,"cranQueries")
+    cranfieldQueryResultPath = os.path.join(cranfieldPath,"cranqrel.txt")
+    listOfQueries = os.listdir(cranfieldQueriesPath)
+    documents = loadDocumentPickles(picklePath)
+
+    print("Please Select a Model:")
+    print("1. Raw Count Model")
+    print("2. Cosine Similirity Model")
+    modelSelection = input()
+    #modelSelection = "2"
+    #go through each query and compute similirty score
+    queryResultList = []
+    for eachQueryFile in listOfQueries:
+        currentQueryFilePath = os.path.join(cranfieldQueriesPath,eachQueryFile)
+        currentQueryFile = open(currentQueryFilePath,'r')
+        query = ""
+        for eachLine in currentQueryFile:
+            query+=eachLine
+        currentQueryFile.close()
+        queryTf = queryProcessing(query.strip())
+        if modelSelection == "1":
+            scoreList = addScoreSimilirity(queryTf,documents)
+        elif modelSelection == "2":
+            scoreList= cosineSimilirity(queryTf,documents)
+        else:
+            print("Please select the correct model by given number 1 or 2")
+            sys.exit()
+        sortedList = sorted(scoreList, key=lambda k: k['finalScore'],reverse=True)
+        queryResultList.append({"queryFileName":eachQueryFile,"scoreList":sortedList})
+    #import cranfield query result
+    cranfieldResultFile = open(cranfieldQueryResultPath,"r")
+    cranfieldResultDict = {}
+    for eachline in cranfieldResultFile:
+        splitList = eachline.split(' ')
+        if not splitList[0] in cranfieldResultDict:
+            cranfieldResultDict[splitList[0]] = [splitList[1]]
+        else:
+            cranfieldResultDict[splitList[0]].append(splitList[1])
+    #evoluation
+    precisionRecallList = []
+    for eachQueryResult in queryResultList:
+        queryid = eachQueryResult['queryFileName'].replace(".txt","")
+        correctHit = 0
+        totalRetreival = 0
+        for eachScore in eachQueryResult['scoreList']:
+            if not eachScore['finalScore'] == 0:
+                totalRetreival+=1
+                if eachScore['fileName'].replace(".txt","") in cranfieldResultDict[queryid]:
+                    correctHit+=1
+        precision = correctHit/totalRetreival
+        recall = correctHit/len(cranfieldResultDict[queryid])
+        precisionRecallList.append({"queryid":queryid,"precision":precision,"recall":recall})
     
 else:
     print("Extra commands require")
     print("-d for document processing")
     print("-q for query processing")
     print("-c for clustering")
+    print("-cran for cranfield query evoluations")

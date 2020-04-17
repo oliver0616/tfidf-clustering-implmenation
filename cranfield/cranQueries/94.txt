@@ -1,0 +1,4 @@
+ 094
+.W
+how is the heat transfer downstream of the mass transfer region effected
+by mass transfer at the nose of a blunted cone .

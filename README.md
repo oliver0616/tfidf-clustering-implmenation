@@ -26,3 +26,4 @@ The system has 3 possible commands:
 - python system.py -d: document processing, calculating tfidf score for all documents
 - python system.py -q: query processing, allow user to select a model and query the system
 - python system.py -c: clustering, clusering using the tfidf scores and display the dendrogram. hierarchy clustering is implemented
+- python system.py -cran: cranfield queries evlouation, return the precision and recall for each query
