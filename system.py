@@ -302,6 +302,7 @@ elif userCommand == "-cran":
         precision = correctHit/totalRetreival
         recall = correctHit/len(cranfieldResultDict[queryid])
         precisionRecallList.append({"queryid":queryid,"precision":precision,"recall":recall})
+        prettyPrint(precisionRecallList)
     
 else:
     print("Extra commands require")
