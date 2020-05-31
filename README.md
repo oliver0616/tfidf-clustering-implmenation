@@ -10,7 +10,8 @@ tfidf scores calculate for each documents
 raw count calculate, cosine similirty calculate
 ## Clustering
 hierarchy clustering, method: single, complete, centroid, avergae, weighted
-
+## Brown Clustering
+brown word clustering, impletment by Michael Heilman(https://github.com/mheilman/tan-clustering), license is include under tan-cluster directory, See license.txt
 # Setup
 1. Clone this repository
 2. Please Create 2 directory name, 'data' and 'pickle' wihtin this repository

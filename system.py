@@ -5,6 +5,7 @@ import string
 import math
 import pickle
 import numpy as np
+
 from scipy.cluster.hierarchy import dendrogram, linkage
 from matplotlib import pyplot as plt
 from nltk.corpus import stopwords
@@ -14,22 +15,35 @@ from nltk.stem import PorterStemmer
 #Methods
 #Remove stopwords, lowercase all character, stemming, remove numbers and tokenize all words, remove puntuations
 #Collect term frequency and inverse document frequnecy
-def documentProcessing(fileData,currentTf,fileName):
+def documentProcessing(fileData,currentTf,fileName,option):
     stop_words = set(stopwords.words('english'))
     ps = PorterStemmer()
-    for eachLine in fileData:
-        tokenizeLine = nltk.tokenize.word_tokenize(eachLine)
-        for eachWord in tokenizeLine:
-            eachWord = eachWord.lower()
-            eachWord = eachWord.translate(str.maketrans('', '', string.punctuation))
-            if not eachWord in stop_words and not eachWord.isnumeric() and not len(eachWord) == 1 and not len(eachWord) == 0:
-                stemWord = ps.stem(eachWord)
-                if not stemWord in currentTf:
-                    currentTf[stemWord] = 1
-                else:
-                    currentTf[stemWord] += 1
-    returnObject = {'fileName':fileName,'allTerms':currentTf}
-    return returnObject
+    if option == "-tfidf":
+        for eachLine in fileData:
+            tokenizeLine = nltk.tokenize.word_tokenize(eachLine)
+            for eachWord in tokenizeLine:
+                eachWord = eachWord.lower()
+                eachWord = eachWord.translate(str.maketrans('', '', string.punctuation))
+                if not eachWord in stop_words and not eachWord.isnumeric() and not len(eachWord) == 1 and not len(eachWord) == 0:
+                    stemWord = ps.stem(eachWord)
+                    if not stemWord in currentTf:
+                        currentTf[stemWord] = 1
+                    else:
+                        currentTf[stemWord] += 1
+        returnObject = {'fileName':fileName,'allTerms':currentTf}
+        return returnObject
+    elif option=="-brown":
+        text = ""
+        for eachLine in fileData:
+            tokenizeLine = nltk.tokenize.word_tokenize(eachLine)
+            for eachWord in tokenizeLine:
+                eachWord = eachWord.lower()
+                eachWord = eachWord.translate(str.maketrans('', '', string.punctuation))
+                if not eachWord in stop_words and not eachWord.isnumeric() and not len(eachWord) == 1 and not len(eachWord) == 0:
+                    stemWord = ps.stem(eachWord)
+                    text += stemWord + " "
+        returnObject = {'fileName':fileName,'text':text}
+        return returnObject
 
 #Calculate word appear in document through entire document collection
 def wordAppearInDocCal(termApperInDoc,currentDocTerms):
@@ -152,7 +166,13 @@ def prettyPrint(inputList):
 #Main
 cwd = os.getcwd()
 dataPath = os.path.join(cwd,"data")
-picklePath = os.path.join(cwd,"pickle")
+pickleTfidfPath = os.path.join(cwd,"pickleTfidf")
+pickleWordsPath = os.path.join(cwd,"pickleWords")
+brownClusterPath = os.path.join(cwd,"tan-clustering")
+brownCLusterOutputPath = os.path.join(cwd,"brownClusterOutput")
+sys.path.append(brownClusterPath)
+import pmi_cluster as brownCluster
+
 userCommand = ""
 command = sys.argv
 if len(command) > 1:
@@ -160,31 +180,59 @@ if len(command) > 1:
 
 #Document processing, data preprocessing and pickle creation
 if userCommand == "-d":
-    #documents processing, record all tfidf score, and pickle the data
-    listOfFiles = os.listdir(dataPath)
-    totalDocNum = len(listOfFiles)
-    allTf=[]
-    termApperInDoc = {}
-    for eachFile in listOfFiles:
-        print("Processing "+eachFile)
-        currentFilePath = os.path.join(dataPath,eachFile)
-        currentFile = open(currentFilePath,'r',errors="ignore")
-        currentTf = {}
-        currentDic = documentProcessing(currentFile,currentTf,eachFile)
-        termApperInDoc= wordAppearInDocCal(termApperInDoc,currentDic['allTerms'])
-        allTf.append(currentDic)
+    if len(command) > 2:
+        docProcessOption = command[2]
+    else:
+        print("Please provide what method you would like to use. Ex. python system.py -d -tfidf")
+        print("-tfdif for tfidf document processing")
+        print("-brown for brown clustering document processing")
+        sys.exit()
+    if docProcessOption == "-tfidf":
+        #documents processing, record all tfidf score, and pickle the data
+        listOfFiles = os.listdir(dataPath)
+        totalDocNum = len(listOfFiles)
+        allTf=[]
+        termApperInDoc = {}
+        for eachFile in listOfFiles:
+            print("Processing "+eachFile)
+            currentFilePath = os.path.join(dataPath,eachFile)
+            currentFile = open(currentFilePath,'r',errors="ignore")
+            currentTf = {}
+            currentDic = documentProcessing(currentFile,currentTf,eachFile,'-tfidf')
+            termApperInDoc= wordAppearInDocCal(termApperInDoc,currentDic['allTerms'])
+            allTf.append(currentDic)
 
-    tfidfList = tfidfCal(allTf,termApperInDoc,totalDocNum)
-    for eachDocument in tfidfList:
-        docName = eachDocument['fileName'].replace(".txt",".pickle")
-        pickleFilePath = os.path.join(picklePath,docName)
-        pickleFile = open(pickleFilePath,'wb')
-        pickle.dump(eachDocument,pickleFile)
-        pickleFile.close()
+        tfidfList = tfidfCal(allTf,termApperInDoc,totalDocNum)
+        for eachDocument in tfidfList:
+            docName = eachDocument['fileName'].replace(".txt",".pickle")
+            pickleFilePath = os.path.join(pickleTfidfPath,docName)
+            pickleFile = open(pickleFilePath,'wb')
+            pickle.dump(eachDocument,pickleFile)
+            pickleFile.close()
+    elif docProcessOption == "-brown":
+        #documents processing, record all tfidf score, and pickle the data
+        listOfFiles = os.listdir(dataPath)
+        totalDocNum = len(listOfFiles)
+        docList = []
+        for eachFile in listOfFiles:
+            print("Processing "+eachFile)
+            currentFilePath = os.path.join(dataPath,eachFile)
+            currentFile = open(currentFilePath,'r',errors="ignore")
+            currentTf = {}
+            currentDic = documentProcessing(currentFile,currentTf,eachFile,'-brown')
+            docList.append(currentDic)
+        for eachDocument in docList:
+            docName = eachDocument['fileName']
+            text = eachDocument['text']
+            pickleFilePath = os.path.join(pickleWordsPath,docName)
+            pickleFile = open(pickleFilePath,'w')
+            pickleFile.write(text)
+            #pickle.dump(eachDocument,pickleFile)
+            pickleFile.close()
 
 #Query processing, user searching
 elif userCommand == "-q":
-    documents = loadDocumentPickles(picklePath)
+    documents = loadDocumentPickles(pickleTfidfPath)
     scoreList= []
     #userInput = "deep learning question answering system"
     #userInput = "ibm watson"
@@ -231,7 +279,7 @@ elif userCommand == "-c":
         sys.exit()
 
     clusteringOption = ""
-    documents = loadDocumentPickles(picklePath)
+    documents = loadDocumentPickles(pickleTfidfPath)
     documentsCount = len(documents)
     print("Geting All Words")
     wordsSet = getAllWords(documents)
@@ -253,7 +301,7 @@ elif userCommand == "-cran":
     cranfieldQueriesPath = os.path.join(cranfieldPath,"cranQueries")
     cranfieldQueryResultPath = os.path.join(cranfieldPath,"cranqrel.txt")
     listOfQueries = os.listdir(cranfieldQueriesPath)
-    documents = loadDocumentPickles(picklePath)
+    documents = loadDocumentPickles(pickleTfidfPath)
 
     print("Please Select a Model:")
     print("1. Raw Count Model")
@@ -303,10 +351,18 @@ elif userCommand == "-cran":
         recall = correctHit/len(cranfieldResultDict[queryid])
         precisionRecallList.append({"queryid":queryid,"precision":precision,"recall":recall})
         prettyPrint(precisionRecallList)
-    
+elif userCommand == "-b":
+    listOfFiles = os.listdir(pickleWordsPath)
+    for eachFile in listOfFiles:
+        currentFilePath = os.path.join(pickleWordsPath,eachFile)
+        word_counts = brownCluster.make_word_counts(brownCluster.document_generator(currentFilePath, False),None,1)
+        c = brownCluster.DocumentLevelClusters(brownCluster.document_generator(currentFilePath, False),word_counts, 1000)
+        outpufFilePath = os.path.join(brownCLusterOutputPath,eachFile)
+        c.save_clusters(outpufFilePath)
 else:
     print("Extra commands require")
     print("-d for document processing")
     print("-q for query processing")
     print("-c for clustering")
     print("-cran for cranfield query evoluations")
+    print("-b for brown word clustering")
